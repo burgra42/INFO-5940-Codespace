@@ -1,10 +1,10 @@
-aioboto3==12
+ aioboto3==12
 fsspec
 openai~=1.14
 pandas==2
 pydantic==2
 s3fs
-streamlit==1.0
+streamlit>=1.25.0
 tiktoken==0.7.0
 langchain-community~=0.2.15
 langchain~=0.2.15
