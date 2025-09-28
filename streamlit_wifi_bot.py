@@ -9,6 +9,12 @@ st.title("👋 Hello from Will!")
 
 import pathlib
 
+# add the knowledge base with the 'with open' command
+
+# with open("data/hotel_wifi_assist_system_prompt.txt", "r") as f: <- add a KB text file and update refernce here
+  #   system_prompt = f.read()
+
+
 if "messages" not in st.session_state:
     prompt_path = pathlib.Path("/data/hotel_wifi_assist_system_prompt.txt")
     if prompt_path.exists():

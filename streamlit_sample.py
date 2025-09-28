@@ -1,5 +1,6 @@
 import streamlit as st
 from openai import OpenAI
+from pathlib import Path  # Add pathlib for KB file
 
 client = OpenAI()
 
@@ -7,17 +8,24 @@ st.set_page_config(page_title="Hello! It's the Will Olson Show!", layout="center
 
 st.title("👋 Hello from Will!")
 
-import pathlib
+# Load knowledge base for contextual reference
+kb_path = Path("data/hotel_general_knowledge_base.txt")
+if kb_path.exists():
+    knowledge_base = kb_path.read_text(encoding="utf-8")
+else:
+    knowledge_base = ""
 
 if "messages" not in st.session_state:
-    prompt_path = pathlib.Path("/workspaces/INFO-5940-Codespace/data/hotel_guest_system_prompt.txt")
+    prompt_path = Path("/workspaces/INFO-5940-Codespace/data/hotel_guest_system_prompt.txt")
     if prompt_path.exists():
         with open(prompt_path, "r") as f:
             system_prompt = f.read().strip()
     else:
         system_prompt = "You are acting as a helpful training coach to assist hotel school student employees at a hotel. Your mission is to, upon first user interaction, identify yourself as such and ask if the student is ready to begin. When they say yes, your response should begin a back and forth dialogue where you ask them questions about their training and they respond. You should then provide feedback on their responses and guide them through the training process. Make up an issue that a hotel guest would come to the front desk to report. The goal is for the student to satisfy the guest."
+    # Combine KB and system prompt for context
+    combined_prompt = f"{knowledge_base}\n\n{system_prompt}"
     st.session_state["messages"] = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": combined_prompt},
         {"role": "assistant", "content": "Hello! I am your training coach for hotel school student employees. Are you ready to begin your training?"}
     ]
         
