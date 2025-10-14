@@ -4,9 +4,9 @@ from pathlib import Path  # Add pathlib for KB file
 
 client = OpenAI()
 
-st.set_page_config(page_title="Hello! It's the Will Olson Show!", layout="centered")
+st.set_page_config(page_title="Hospitality Training Bot", layout="centered")
 
-st.title("👋 Hello from Will!")
+st.title("Welcome to the hotel! Have fun with our training bot.")
 
 # Load knowledge base for contextual reference
 kb_path = Path("data/hotel_general_knowledge_base.txt")
