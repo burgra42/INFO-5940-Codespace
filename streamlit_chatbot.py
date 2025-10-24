@@ -44,12 +44,12 @@ def documents_hash(docs: list[Document]) -> str:
 
 
 @st.cache_resource
-def build_vectorstore(docs_key: str):
-    """Build and cache a Chroma vectorstore for the current `documents` list.
-    The function is keyed by `docs_key` to avoid pickling the vectorstore itself.
+def build_vectorstore(docs_key: str, docs: list):
+    """Build and cache a Chroma vectorstore for the current `docs` list.
+    Keyed by docs_key so Streamlit won't try to pickle the vectorstore itself.
     """
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=0)
-    chunks = text_splitter.split_documents(documents)
+    chunks = text_splitter.split_documents(docs)
     vectorstore = Chroma.from_documents(documents=chunks, embedding=OpenAIEmbeddings(model="openai.text-embedding-3-large"))
     return vectorstore
 
@@ -96,8 +96,13 @@ def docs_from_uploaded(uploaded_files):
 
 
 # We only use user-uploaded documents as context. Start with empty documents list.
-documents = []
-knowledge_base = ""
+if "messages" not in st.session_state:
+    # No knowledge_base variable anymore — use a concise default system prompt.
+    system_prompt = (
+        "You are a helpful assistant for question-answering. Use any provided retrieved context when available "
+        "and answer concisely (<= 3 sentences). If the answer isn't in the context, say you don't know."
+    )
+    st.session_state["messages"] = [{"role": "system", "content": system_prompt}]
 
 
 # UI: upload + chat
@@ -109,12 +114,19 @@ retriever = None
 if uploaded_files:
     st.info(f"Processing {len(uploaded_files)} uploaded file(s)...")
     uploaded_docs = docs_from_uploaded(uploaded_files)
-    # Use ONLY uploaded docs as the source of truth
-    documents = uploaded_docs
-    # rebuild vectorstore and retriever (keyed by document hash)
-    docs_key = documents_hash(documents)
-    vectorstore = build_vectorstore(docs_key)
+    # persist uploaded docs in session_state
+    st.session_state["documents"] = uploaded_docs
+    docs_key = documents_hash(uploaded_docs)
+    st.session_state["docs_key"] = docs_key
+    # build (or reuse cached) vectorstore keyed by docs_key
+    vectorstore = build_vectorstore(docs_key, uploaded_docs)
+    st.session_state["vectorstore"] = vectorstore
     retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
+else:
+    # reuse any previously-built vectorstore from session_state
+    vectorstore = st.session_state.get("vectorstore")
+    if vectorstore is not None:
+        retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
 
 
 user_question = st.text_input("Ask a question about the source text:")
@@ -131,7 +143,6 @@ if user_question:
             if hasattr(retriever, "similarity_search"):
                 docs = retriever.similarity_search(user_question, k=5)
             elif hasattr(retriever, "get_relevant_documents"):
-                # LangChain Retriever API
                 docs = retriever.get_relevant_documents(user_question)
             elif hasattr(retriever, "retrieve"):
                 docs = retriever.retrieve(user_question)
@@ -150,6 +161,16 @@ if user_question:
     else:
         messages = st.session_state["messages"]
 
+    # Call the OpenAI client
+    with st.spinner("Generating response..."):
+        try:
+            response = client.chat.completions.create(model="openai.gpt-4o", messages=messages)
+            assistant_text = response.choices[0].message.content
+        except Exception as e:
+            assistant_text = f"Error calling API: {e}"
+            logging.error(assistant_text)
+
+    st.session_state["messages"].append({"role": "assistant", "content": assistant_text})
     # Call the OpenAI client
     with st.spinner("Generating response..."):
         try:

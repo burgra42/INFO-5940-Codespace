@@ -13,6 +13,8 @@
 ## More Generative AI use  
     * I am now using gpt-4o to assist me in inserting the RAG text splitting and vectorizing code in the correct place
     * I created a new Jupyter notebook to mock up the RAG 
-    * I used Github's AI to help with the code
+    * I used Github's Copilot AI to help with the code
     * I installed pdfplumber and pypdf to benable processing of PDF files
+    * I have the bot working but the converstaional piece is missing. I think I need to add code to tell it to continue the session with the RAG data and the user comments. 
+    * I used Github Copilot extensively to trouobleshoot the code
     
