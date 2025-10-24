@@ -17,4 +17,5 @@
     * I installed pdfplumber and pypdf to benable processing of PDF files
     * I have the bot working but the converstaional piece is missing. I think I need to add code to tell it to continue the session with the RAG data and the user comments. 
     * I used Github Copilot extensively to trouobleshoot the code
+    * I have the chatbot reading PDFs, but it is not yet converstaional and the RAG remembers the previous PDF when refreshing. This may be fixed by closing the browser tab and opening a new one or starting a new session. 
     
