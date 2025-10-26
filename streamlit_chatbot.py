@@ -16,7 +16,7 @@ from langchain.schema import Document
 logging.basicConfig(level=logging.INFO)
 
 # Config
-st.set_page_config(page_title="RAG Chatbot", layout="centered")
+st.set_page_config(page_title="Will Olson's INFO 5940 RAG Chatbot", layout="centered")
 
 API_KEY = os.environ.get("API_KEY")
 if not API_KEY:
@@ -48,7 +48,7 @@ def build_vectorstore(docs_key: str, docs: list):
     """Build and cache a Chroma vectorstore for the current `docs` list.
     Keyed by docs_key so Streamlit won't try to pickle the vectorstore itself.
     """
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=0)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=0)
     chunks = text_splitter.split_documents(docs)
     vectorstore = Chroma.from_documents(documents=chunks, embedding=OpenAIEmbeddings(model="openai.text-embedding-3-large"))
     return vectorstore
@@ -100,14 +100,14 @@ if "messages" not in st.session_state:
     # No knowledge_base variable anymore — use a concise default system prompt.
     system_prompt = (
         "You are a helpful assistant for question-answering. Use any provided retrieved context when available "
-        "and answer concisely (<= 3 sentences). If the answer isn't in the context, say you don't know."
+        "and answer concisely (<= 3 sentences). Answer conversationally with the user. You are interested in thier curiousity. If the answer isn't in the context, let the user know that the answer does not appear to be in the supplied documents."
     )
     st.session_state["messages"] = [{"role": "system", "content": system_prompt}]
 
 
 # UI: upload + chat
-st.title("RAG Chatbot")
-st.markdown("Upload .txt, .md, or .pdf files to add to the knowledge base used for retrieval.")
+st.title("Will's Document RAG Chatbot")
+st.markdown("Upload .txt, .md, or .pdf files to add to discuss with the almighty bot!")
 
 uploaded_files = st.file_uploader("Upload documents", type=["txt", "md", "pdf"], accept_multiple_files=True)
 retriever = None
@@ -129,16 +129,20 @@ else:
         retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
 
 
-user_question = st.text_input("Ask a question about the source text:")
+# Handle user input and produce exactly one assistant response per submission.
+# (Removes the duplicated API call / duplicated append and the stray knowledge_base block.)
+# Replace the single st.text_input + immediate handling with a form + on_click callback
+def on_submit():
+    user_question = st.session_state.get("q", "").strip()
+    if not user_question:
+        return
 
-if "messages" not in st.session_state:
-    system_prompt = knowledge_base + "\n\nYou are a helpful assistant. Use the knowledge base above when responding."
-    st.session_state["messages"] = [{"role": "system", "content": system_prompt}]
-
-if user_question:
+    # persist the user's query in the conversation history
     st.session_state["messages"].append({"role": "user", "content": user_question})
+
+    # retrieve relevant docs if a retriever exists
+    docs = []
     if retriever:
-        # VectorStore retriever APIs differ between versions. Try several common methods.
         try:
             if hasattr(retriever, "similarity_search"):
                 docs = retriever.similarity_search(user_question, k=5)
@@ -147,40 +151,57 @@ if user_question:
             elif hasattr(retriever, "retrieve"):
                 docs = retriever.retrieve(user_question)
             else:
-                raise AttributeError("Retriever has no supported retrieval method")
+                docs = []
         except Exception as e:
             logging.error(f"Retriever error: {e}")
             docs = []
-        context = "\n\n---\n\n".join(d.page_content for d in docs)
+
+    # build the system prompt (include context when available)
+    context = "\n\n---\n\n".join(d.page_content for d in docs) if docs else ""
+    if context:
         system_instructions = (
-            "You are a helpful assistant for question answering. Use ONLY the provided context to answer concisely (<=3 sentences).\n"
-            "If the answer isn't in the context, say you don't know.\n\n"
+            "You are a helpful assistant for question-answering. Use any provided retrieved context when available "
+            "and answer concisely (<= 3 sentences). Answer conversationally with the user. You are interested in their curiosity. If the answer isn't in the context, let the user know that the answer does not appear to be in the supplied documents.\n\n"
             f"Context:\n{context}"
         )
-        messages = [{"role": "system", "content": system_instructions}, {"role": "user", "content": user_question}]
     else:
-        messages = st.session_state["messages"]
+        system_instructions = (
+            "You are a helpful assistant for question-answering. Use any provided retrieved context when available "
+            "and answer concisely (<= 3 sentences). Answer conversationally with the user. You are interested in their curiosity. If the answer isn't in the context, let the user know that the answer does not appear to be in the supplied documents."
+        )
 
-    # Call the OpenAI client
+    # prepare messages to send (system + history). user's latest message already appended above.
+    history_messages = [m for m in st.session_state["messages"] if m["role"] != "system"]
+    messages_for_llm = [{"role": "system", "content": system_instructions}] + history_messages
+
+    # single API call, robust extraction of text, append once
     with st.spinner("Generating response..."):
         try:
-            response = client.chat.completions.create(model="openai.gpt-4o", messages=messages)
-            assistant_text = response.choices[0].message.content
+            response = client.chat.completions.create(model="openai.gpt-4o", messages=messages_for_llm)
+            assistant_text = ""
+            if hasattr(response, "choices") and len(response.choices) > 0:
+                choice = response.choices[0]
+                if hasattr(choice, "message") and hasattr(choice.message, "content"):
+                    assistant_text = choice.message.content
+                else:
+                    assistant_text = choice.get("message", {}).get("content", "") or choice.get("text", "")
+            else:
+                assistant_text = str(response)
         except Exception as e:
             assistant_text = f"Error calling API: {e}"
             logging.error(assistant_text)
 
     st.session_state["messages"].append({"role": "assistant", "content": assistant_text})
-    # Call the OpenAI client
-    with st.spinner("Generating response..."):
-        try:
-            response = client.chat.completions.create(model="openai.gpt-4o", messages=messages)
-            assistant_text = response.choices[0].message.content
-        except Exception as e:
-            assistant_text = f"Error calling API: {e}"
-            logging.error(assistant_text)
 
-    st.session_state["messages"].append({"role": "assistant", "content": assistant_text})
+    # Clear the form input safely (we're inside the callback)
+    st.session_state["q"] = ""
+
+
+# render single form (input clears on submit via on_submit)
+with st.form("ask_form"):
+    st.text_input("Ask your questions about the uploaded documents here:", key="q", placeholder="You can keep the converstaion going here...")
+    st.form_submit_button("Send", on_click=on_submit)
+
 
 
 # Display chat history
