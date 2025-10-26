@@ -58,3 +58,15 @@
 	◦	Restart Streamlit and kernel after package or code changes.
 	•	Files and edits
 	◦	Main edits suggested for: chat_with_pdf.py, streamlit_chatbot.py, assignment1_chatbot.py (provided complete replacement/code blocks for the form, callbacks, vectorstore building, and helper functions).
+
+	### Assistance added (2025-10-26)
+- Fixed incorrect imports and recommended installing langchain-openai, chromadb, openai, streamlit, tiktoken, pdfplumber, pypdf.
+- Implemented RAG helpers: documents_hash (SHA256), build_vectorstore (cached Chroma), docs_from_uploaded, extract_text_from_pdf_bytes (pdfplumber / pypdf fallback).
+- Addressed LangChain deprecation warnings and suggested updated import paths.
+- Persisted documents, vectorstore, docs_key, and chat history in `st.session_state` for multi-turn conversations.
+- Ensured a single LLM API call per user submission; removed duplicate calls in render loop to prevent repeated assistant responses.
+- Explained "widget-backed session state key" issue and implemented a safe `st.form` + `on_click` callback to clear the input inside the callback.
+- Provided robust retriever usage (handles `similarity_search`, `get_relevant_documents`, `retrieve`) and context formatting for system prompt.
+- Added CSS suggestion to pin the form to the bottom (exercise caution; DOM-dependent) and recommended using a text label ("Send") instead of an image for the submit button.
+- Debugging guidance: print raw LLM response when duplicate text persists; restart Streamlit/kernel after package changes.
+- Located and removed stray `st.text_input` that caused a second input box; provided line-numbered guidance and single-file replacement snippets to consolidate behavior.
