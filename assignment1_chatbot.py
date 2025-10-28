@@ -1,4 +1,3 @@
-# ...existing code...
 import os
 import io
 import logging
@@ -46,7 +45,7 @@ def documents_hash(docs: list[Document]) -> str:
 @st.cache_resource
 def build_vectorstore(docs_key: str, docs: list[Document]):
     """Build and cache a Chroma vectorstore for the current `docs` list."""
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=0)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
     chunks = text_splitter.split_documents(docs)
     vectorstore = Chroma.from_documents(documents=chunks, embedding=OpenAIEmbeddings(model="openai.text-embedding-3-large"))
     return vectorstore
@@ -69,20 +68,23 @@ def extract_text_from_pdf_bytes(b: bytes) -> str:
 def docs_from_uploaded(uploaded_files):
     docs = []
     for uploaded in uploaded_files:
-        name = uploaded.name
-        content = None
-        if name.lower().endswith((".txt", ".md")):
-            content = uploaded.read().decode("utf-8", errors="ignore")
-        elif name.lower().endswith(".pdf"):
-            raw = uploaded.read()
-            content = extract_text_from_pdf_bytes(raw)
+        fname = uploaded.name
+        content_bytes = uploaded.read()
+        if fname.lower().endswith((".txt", ".md")):
+            text = content_bytes.decode("utf-8", errors="replace")
+        elif fname.lower().endswith(".pdf"):
+            text = extract_text_from_pdf_bytes(content_bytes)
         else:
-            # Unknown type: attempt decode
-            try:
-                content = uploaded.read().decode("utf-8", errors="ignore")
-            except Exception:
-                content = ""
-        docs.append(Document(page_content=content or "", metadata={"source": name}))
+            text = content_bytes.decode("utf-8", errors="replace")
+        # Attach explicit metadata so citations are easy later
+        meta = {"source": fname}
+        # optional: include a short id/hash for stable citation tokens
+        try:
+            short_id = hashlib.sha1((fname + text[:2000]).encode("utf-8", errors="ignore")).hexdigest()[:8]
+            meta["doc_id"] = short_id
+        except Exception:
+            meta["doc_id"] = fname
+        docs.append(Document(page_content=text, metadata=meta))
     return docs
 
 # Initialize session state
@@ -95,12 +97,13 @@ if "docs_key" not in st.session_state:
 if "messages" not in st.session_state:
     system_prompt = (
         "You are a helpful assistant for question-answering. Use any provided retrieved context when available "
-        "and answer concisely (<= 3 sentences). If the answer isn't in the context, say you don't know."
+        "and answer conversationally but efficiently. If the answer isn't in the context, let the user know that the information is not in any porvided text. Ask " \
+        "them if they would like to upload more docuements to help you answer their questions."
     )
     st.session_state["messages"] = [{"role": "system", "content": system_prompt}]
 
 # UI: upload + chat
-st.title("RAG Chatbot")
+st.title("Document Retrieval Chatbot")
 st.markdown("Upload .txt, .md, or .pdf files to be able to explore the content!")
 
 uploaded_files = st.file_uploader("Upload documents", type=["txt", "md", "pdf"], accept_multiple_files=True)
@@ -120,8 +123,7 @@ else:
         retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
 
 
-# ...existing code...
-# Chat input: use form with an on_click callback that clears the input inside the callback
+# Chat input: use form with an on_click callback that clears the input inside the callback``
 def on_submit():
     user_question = st.session_state.get("q", "").strip()
     if not user_question:
@@ -144,14 +146,26 @@ def on_submit():
             logging.error(f"Retriever error: {e}")
             docs = []
 
-    # Prepare context and system instruction
-    def format_docs(docs_list):
-        return "\n\n---\n\n".join((d.page_content or "")[:2000] for d in docs_list)
+    # Prepare context including source metadata for citation
+    def format_docs_with_citations(docs_list):
+        parts = []
+        for i, d in enumerate(docs_list, start=1):
+            src = ""
+            try:
+                src = d.metadata.get("source", d.metadata.get("doc_id", f"doc{i}"))
+            except Exception:
+                src = f"doc{i}"
+            # include a short citation token, e.g. [src:filename#id]
+            citation_token = f"[source: {src}]"
+            snippet = (d.page_content or "")[:2000]  # limit length
+            parts.append(f"{citation_token}\n\n{snippet}")
+        return "\n\n---\n\n".join(parts)
 
-    context = format_docs(docs) if docs else ""
+    context = format_docs_with_citations(docs) if docs else ""
     if context:
         system_instructions = (
-            "You are a helpful assistant for question answering. Use ONLY the provided context to answer concisely (<=3 sentences). "
+            "You are a helpful assistant for question-answering. Use ONLY the provided context and answer conversationally. "
+            "When you use information from the provided context, include an inline citation token matching the source block (for example: [source: filename.txt]). "
             "If the answer isn't in the context, say you don't know.\n\n"
             f"Context:\n{context}"
         )
@@ -187,9 +201,8 @@ def on_submit():
     st.session_state["q"] = ""
 
 with st.form("ask_form"):
-    st.text_input("Ask your questions about the source text:", key="q", placeholder="Type your question here...")
+    st.text_input("Ask your questions about your documents here:", key="q", placeholder="Keep the conversation going here...")
     st.form_submit_button("Send", on_click=on_submit)
-# ...existing code...
 
 # Display chat history using Streamlit chat UI
 for msg in st.session_state["messages"]:
@@ -199,4 +212,3 @@ for msg in st.session_state["messages"]:
         st.chat_message("user").write(msg["content"])
     else:
         st.chat_message("assistant").write(msg["content"])
-    # ...existing code...

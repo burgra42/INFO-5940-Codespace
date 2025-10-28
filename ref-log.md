@@ -1,5 +1,23 @@
+##Final Python File
+* The file titled 'assignment1_chatbot.py' is the one I would like to turn in.
+* I left the other files in my codespace in case you want to look at them
+* Thanks! ~Will
+
+## About my Process
+	* The first thing I should asy is that I am new to coding. I used generative AI to write almost all of the code. I would not have been able to complete the assignment without doing so. It is amazing that someone with my experience can create a RAG chatbot! 
+	* I used primarily the built-in Github Copilot for this project. I expirmanted with GROK at teh beginning but ran into several version issues between components and I am not a strong enough coder to sort that out efficiently. 
+	* In the end, I created three python files before completing 'assignmwnt1_chatbot.py'
+	* In addition the the generative AI in Github, I referenced class notes, Medium articles, and Reddit to build this chatbot.
+	* I also received assistance frommy colleague, Jason Woodward, on how to use Github properly. He helped reassure me that I did not accidentally publish my API key and explained the Commit vs. Publish process. 
+		* I should stress emphatically that Jason offered NO assistance on the actual assignment, only on coding precedure and best practices within Github in general. I do not believe any honor code violation took place. 
+	* I settled on a chunk size of 1000, overlap of 0, and kwarg of 5. I found that this gave me consistently good results with the docs I used for testing. 
+
+## Read below for notes about the Generative AI that I used if you would like. 
+
+
 ## Generative AI Use
-    * I used GROK to help write the initial code. 
+    * I used generative AI to create documents to use for tesitng the RAG application.  
+	I used GROK to help write the initial code. 
     * I ran this command to install some additonal resources based on GROk's reposnse
         * pip install streamlit openai langchain sentence-transformers faiss-cpu
     * I used this becasue I am new to coding and we discussed GROK 4's proficiency in code writing during class so I wanted to see how it worked. 
