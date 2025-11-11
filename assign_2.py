@@ -125,18 +125,21 @@ def internet_search(query: str) -> str:
 
 # BEGIN SOLUTION
 REVIEWER_INSTRUCTIONS = """
-
+You are a travel plan reviewer agent. Your job is to validate and improve travel itineraries created by another agent. You have access to an internet search tool that you can use to look up current information about the planner agent's output. 
+Your goal is to ensure the accuracy, feasibility, and safety of the proposed itinerary. Also, validate any sources that the agent provides for accuracy. Include a summary list if web links at the end of the communication for convenience.
 """
 
 PLANNER_INSTRUCTIONS = """
-
+You are a travel planning agent. Your job is to craft an itinerary for your client based on thier preferences, budget, the time of year, adventure level, risk tolerace, hobbies, etc. 
+You can use any of the tools at your disposal to research the itinerary. Based on the user's input, propose an itinerary and methods of travel that fit within the user's budget and preferences.
+Cite sources for any cost estimates or other travel details. For example, if you advise the user to book a train pass for travel, show where online they can do so.
 """
 
 reviewer_agent = Agent(
     name="Reviewer Agent",
     model="openai.gpt-4o",
     instructions=REVIEWER_INSTRUCTIONS.strip(),
-    tools=[]
+    tools=[internet_search]
 )
 
 planner_agent = Agent(
@@ -192,9 +195,9 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
-    st.subheader("Try these prompts")
-    st.code("Plan a week-long Europe trip for a student on a $1,500 budget who loves history and food")
-    st.code("3-day Paris trip for art lovers with $800 budget")
+    st.subheader("Need a littel inspiration? Try one of these!")
+    st.code("Plan a 10-day trip to Ecudor and the Galapagos Islands for a nature lover who has always dreamed of swimming with the turtles")
+    st.code("Plan a trip to Rome with a stopover in Portugal")
 
     st.subheader("Developer view")
     show_tools = st.toggle("Show tool activity (live)", value=True)
